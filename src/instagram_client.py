@@ -1,7 +1,7 @@
 import instaloader
 import time
 import random
-from .config import INSTAGRAM_USER, INSTAGRAM_PASSWORD
+from config import INSTAGRAM_USER, INSTAGRAM_PASSWORD
 
 class InstagramClient:
     def __init__(self):
