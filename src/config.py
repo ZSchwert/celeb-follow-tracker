@@ -110,7 +110,6 @@ CELEBRITIES = [
 "offsetyrn",
 "quavohuncho",
 "takeoff",
-"21savage",
 "kendricklamar",
 "schoolboyq",
 "tylerthecreator",
