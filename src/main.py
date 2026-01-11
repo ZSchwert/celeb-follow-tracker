@@ -1,11 +1,12 @@
+import sys
+sys.path.append("src")
 import time
 import schedule
 import datetime
-from .config import CELEBRITIES
-from .instagram_client import InstagramClient
-from .twitter_client import TwitterClient
-from .tracker import Tracker
-
+from config import CELEBRITIES
+from instagram_client import InstagramClient
+from twitter_client import TwitterClient
+from tracker import Tracker
 def run_tracker_job():
     print(f"--- Starting Tracker Job at {datetime.datetime.now()} ---")
 
