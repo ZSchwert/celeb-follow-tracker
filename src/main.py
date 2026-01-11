@@ -45,13 +45,23 @@ def run_tracker_job():
             if new_follows:
                 print(f"  Found {len(new_follows)} new follows.")
                 for new_user in new_follows:
-                    msg = f"🚨 UPDATE: @{celebrity} started following @{new_user} on Instagram!"
+                    msg = f"""🚨 Instagram Follow Change!
+
+@{celebrity} has just followed:
+👉 @{new_user}
+
+Stay tuned for more follow reports."""
                     twitter_client.post_tweet(msg)
 
             if unfollows:
                 print(f"  Found {len(unfollows)} unfollows.")
                 for old_user in unfollows:
-                    msg = f"🚨 UPDATE: @{celebrity} unfollowed @{old_user} on Instagram."
+                    msg = f"""🚨 Instagram Follow Change!
+
+@{celebrity} has just unfollowed:
+👉 @{old_user}
+
+Stay tuned for more follow reports."""
                     twitter_client.post_tweet(msg)
 
             if not new_follows and not unfollows:
