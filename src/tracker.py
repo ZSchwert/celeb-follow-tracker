@@ -1,7 +1,7 @@
 import json
 import os
 import datetime
-from .config import DATA_DIR
+from config import DATA_DIR
 
 class Tracker:
     def __init__(self, data_dir=DATA_DIR):
