@@ -601,7 +601,6 @@ CELEBRITIES = [
 "rodrygo",
 "endrick",
 "bellinghamjr",
-
 "bukayosaka87",
 "philfoden",
 "colepalmer10",
@@ -610,23 +609,19 @@ CELEBRITIES = [
 "rashford",
 "greenwood",
 "jadonsancho",
-
 "giovannireyna",
 "tyleradams",
 "westonmckennie",
-
 "khvicha_kvaratskhelia",
 "osimhen9",
 "rafaelleao",
 "joaofelix79",
 "goncaloramos",
 "enricobonaventura",
-
 "julianalvarez",
 "alexis_macallister",
 "lautaro_jmartinez",
 "paulodybala",
-
 "darwinnunez",
 "codygakpo",
 "nicolozaniolo",
@@ -728,7 +723,6 @@ CELEBRITIES = [
 "yaya_toure",
 "didierdrogba",
 "samuel_etoo",
-
 "wilfriedzaha",
 "sebastienhaller",
 "nicolaspepe19",
@@ -739,7 +733,6 @@ CELEBRITIES = [
 "ibrahimakonate",
 "boulayedia",
 "sofianeboufal",
-
 "pape_matar_sarr",
 "eduardomendy",
 "krepindiatta",
@@ -760,7 +753,6 @@ CELEBRITIES = [
 "dkmetcalf",
 "micahparsons11",
 "saquon",
-
 "jalenhurts",
 "steviesmithsr",
 "davanteadams",
@@ -781,7 +773,6 @@ CELEBRITIES = [
 "jayson_tatum",
 "jimmybutler",
 "damianlillard",
-
 "devinbook",
 "anthonyedwards",
 "jaylenbrown",
@@ -808,7 +799,6 @@ CELEBRITIES = [
 "mike.trout",
 "bryceharper3",
 "alexrodriguez",
-
 "sidneycrosby87",
 "alexovechkin",
 "connormcdavid97",
@@ -903,5 +893,5 @@ CELEBRITIES = [
 "mirandakerr",
 "rosiehw",
 "alessandraambrosio",
-victoriassecret
+"victoriassecret",
 ]
