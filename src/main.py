@@ -60,10 +60,6 @@ def main():
     # Then schedule every 30 minutes (optional – workflow already runs on cron, but this is okay)
     schedule.every(30).minutes.do(run_tracker_job)
 
-    while True:
-        schedule.run_pending()
-        time.sleep(5)
-
 
 if __name__ == "__main__":
     main()
