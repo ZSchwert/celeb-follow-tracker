@@ -2,6 +2,8 @@ name: Instagram Follow Tracker
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 * * * *' # Her saat başı otomatik çalışması için (isteğe bağlı)
 
 jobs:
   run:
@@ -13,6 +15,13 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: "3.10"
+
+      # --- YENİ ADIM: SESSION CACHING ---
+      - name: Restore Instagram Session
+        uses: actions/cache@v3
+        with:
+          path: session-*
+          key: ${{ runner.os }}-instagram-session-${{ secrets.INSTAGRAM_USERNAME }}
 
       - name: Install dependencies
         run: pip install -r requirements.txt
