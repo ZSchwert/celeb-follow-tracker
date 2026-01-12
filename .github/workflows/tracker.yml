@@ -3,7 +3,7 @@ name: Instagram Follow Tracker
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 * * * *' # Her saat başı otomatik çalışması için (isteğe bağlı)
+    - cron: '0 * * * *'
 
 jobs:
   run:
@@ -16,7 +16,7 @@ jobs:
         with:
           python-version: "3.10"
 
-      # --- YENİ ADIM: SESSION CACHING ---
+      # Oturumu saklamak için cache ekliyoruz
       - name: Restore Instagram Session
         uses: actions/cache@v3
         with:
@@ -30,10 +30,12 @@ jobs:
         env:
           TARGET_USERNAMES: ${{ secrets.TARGET_USERNAMES }}
           WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
-          INSTAGRAM_USER: ${{ secrets.INSTAGRAM_USERNAME }}
+          INSTAGRAM_USER: ${{ secrets.INSTAGRAM_USERNAME }}  # Burayı eşitledik
           INSTAGRAM_PASSWORD: ${{ secrets.INSTAGRAM_PASSWORD }}
           TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
           TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
           TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
           TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python src/main.py
