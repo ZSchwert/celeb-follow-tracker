@@ -16,12 +16,6 @@ jobs:
         with:
           python-version: "3.10"
 
-      - name: Restore Instagram Session
-        uses: actions/cache@v3
-        with:
-          path: session-*
-          key: ${{ runner.os }}-instagram-session-${{ secrets.INSTAGRAM_USERNAME }}
-
       - name: Install dependencies
         run: pip install -r requirements.txt
 
@@ -36,6 +30,4 @@ jobs:
           TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
           TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_TOKEN_SECRET }}
           TWITTER_BEARER_TOKEN: ${{ secrets.TWITTER_BEARER_TOKEN }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python src/main.py
