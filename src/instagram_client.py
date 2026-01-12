@@ -8,7 +8,7 @@ class InstagramClient:
     def __init__(self):
         self.L = instaloader.Instaloader()
         self.is_logged_in = False
-        self.session_file = f"session-{INSTAGRAM_USER}"
+        self.session_file = os.path.join(os.getcwd(), f"session-{INSTAGRAM_USER}")
 
         if INSTAGRAM_USER:
             self._smart_login()
