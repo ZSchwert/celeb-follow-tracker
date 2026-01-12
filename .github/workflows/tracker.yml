@@ -23,7 +23,7 @@ jobs:
         env:
           TARGET_USERNAMES: ${{ secrets.TARGET_USERNAMES }}
           WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
-          INSTAGRAM_USER: ${{ secrets.INSTAGRAM_USERNAME }}
+          INSTAGRAM_USER: "schwertezel"
           INSTAGRAM_PASSWORD: ${{ secrets.INSTAGRAM_PASSWORD }}
           TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
           TWITTER_API_SECRET: ${{ secrets.TWITTER_API_KEY_SECRET }}
