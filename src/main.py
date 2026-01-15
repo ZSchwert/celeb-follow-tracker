@@ -1,61 +1,61 @@
-import sys
-import os
-import time
-import schedule
-import datetime
+name: Follow Tracker (Hourly)
 
-# Ensure we can import modules from /src when running from repo root (GitHub Actions)
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))  # .../src
-if CURRENT_DIR not in sys.path:
-    sys.path.insert(0, CURRENT_DIR)
+on:
+  workflow_dispatch:
+  schedule:
+    # Saat basi (UTC). TR saati fark etmez; her saat calisacak.
+    - cron: "0 * * * *"
 
-from config import CELEBRITIES
-from instagram_client import InstagramClient
-from twitter_client import TwitterClient
-from tracker import Tracker
+jobs:
+  track:
+    runs-on: ubuntu-latest
 
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
-def run_tracker_job():
-    print(f"--- Starting Tracker Job at {datetime.datetime.now()} ---")
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-    insta_client = InstagramClient()
-    twitter_client = TwitterClient()
-    tracker = Tracker()
+      - name: Restore snapshots cache
+        uses: actions/cache@v4
+        with:
+          path: snapshots
+          key: snapshots-${{ github.run_id }}
+          restore-keys: |
+            snapshots-
 
-    for celebrity in CELEBRITIES:
-        try:
-            print(f"Checking {celebrity}...")
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-            # 1) Fetch current following
-            current_following = insta_client.get_following(celebrity)
+      - name: Debug - list files
+        run: |
+          echo "PWD:"
+          pwd
+          echo "ROOT:"
+          ls -la
+          echo "SRC:"
+          ls -la src || true
+          echo "DATA:"
+          ls -la data || true
+          echo "SNAPSHOTS:"
+          ls -la snapshots || true
 
-            # 2) Load previous following (if any) & compare
-            previous_following = tracker.load_previous_following(celebrity)
+      - name: Run tracker
+        env:
+          TARGET_USERNAMES: ${{ secrets.TARGET_USERNAMES }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          mkdir -p snapshots
+          python src/main.py
 
-            # 3) Detect changes
-            added, removed = tracker.diff_following(previous_following, current_following)
-
-            # 4) Notify if changed
-            if added or removed:
-                tracker.notify_changes(
-                    celebrity=celebrity,
-                    added=added,
-                    removed=removed,
-                    webhook_url=os.environ.get("WEBHOOK_URL", ""),
-                )
-
-            # 5) Save current snapshot
-            tracker.save_following(celebrity, current_following)
-
-        except Exception as e:
-            print(f"[ERROR] Failed for {celebrity}: {e}")
-
-    print(f"--- Finished Tracker Job at {datetime.datetime.now()} ---")
-
-
-def main():
-    # Run once immediately
-    run_tracker_job()
-
-if __name__ == "__main__":
-    main()
+      - name: Save snapshots cache
+        uses: actions/cache@v4
+        with:
+          path: snapshots
+          key: snapshots-${{ github.run_id }}
