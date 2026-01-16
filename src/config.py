@@ -1,12 +1,16 @@
 import os
 
-# RapidAPI
-RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY", "")
-RAPIDAPI_HOST = os.getenv("RAPIDAPI_HOST", "")  # örn: instagram-master-api-2025.p.rapidapi.com
+# Instagram login (instagrapi)
+IG_USERNAME = os.getenv("IG_USERNAME", "")
+IG_PASSWORD = os.getenv("IG_PASSWORD", "")
 
-# Telegram (zaten sende var)
+# Telegram
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 
-# Hedef kullanıcılar (virgülle)
+# Targets
 TARGET_USERNAMES = os.getenv("TARGET_USERNAMES", "")
+
+# Batch config
+BATCH_SIZE = int(os.getenv("BATCH_SIZE", "60"))
+PER_USER_SLEEP = float(os.getenv("PER_USER_SLEEP", "1.0"))
