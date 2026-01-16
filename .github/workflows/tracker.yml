@@ -32,14 +32,17 @@ jobs:
             instagrapi-settings-
 
       - name: Run tracker
+        run: |
+          echo "=== SHOW MAIN.PY HEAD ==="
+          sed -n '1,40p' src/main.py
+          echo "=== RUN ==="
+          python src/main.py
         env:
           TARGET_USERNAMES: ${{ secrets.TARGET_USERNAMES }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-
           IG_USERNAME: ${{ secrets.IG_USERNAME }}
           IG_PASSWORD: ${{ secrets.IG_PASSWORD }}
-
           BATCH_SIZE: "60"
         run: python src/main.py
 
