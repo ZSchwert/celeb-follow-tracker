@@ -11,9 +11,6 @@ SNAP_DIR = "snapshots"
 
 
 def parse_targets(raw: str) -> List[str]:
-    """
-    TARGET_USERNAMES: "user1,user2,user3" veya satir satir da olabilir.
-    """
     if not raw:
         return []
     raw = raw.replace("\n", ",")
@@ -68,11 +65,31 @@ def diff_following(prev: Dict[str, Any], curr: Dict[str, Any]) -> Dict[str, List
     return {"added": added, "removed": removed}
 
 
+def safe_request(url: str, headers: Dict[str, str], params: Dict[str, str], retries: int = 5) -> requests.Response:
+    """
+    429 (Too Many Requests) gelirse bekleyip tekrar dener.
+    """
+    for attempt in range(retries):
+        r = requests.get(url, headers=headers, params=params, timeout=30)
+
+        if r.status_code == 429:
+            wait = (attempt + 1) * 3  # 3, 6, 9, 12, 15 saniye bekle
+            print(f"[RATE LIMIT] 429 geldi. {wait} sn bekleniyor...")
+            time.sleep(wait)
+            continue
+
+        if r.status_code >= 500:
+            wait = 5
+            print(f"[SERVER ERROR] {r.status_code}. {wait} sn bekleniyor...")
+            time.sleep(wait)
+            continue
+
+        return r
+
+    raise RuntimeError("Too many failed attempts due to rate limit.")
+
+
 def fetch_current_data(username: str) -> Dict[str, Any]:
-    """
-    RapidAPI: Instagram Master API 2025
-    Endpoint: /user/following?username_or_id_or_url=<username>
-    """
     api_key = (os.environ.get("RAPIDAPI_KEY") or "").strip()
     api_host = (os.environ.get("RAPIDAPI_HOST") or "").strip()
 
@@ -86,11 +103,10 @@ def fetch_current_data(username: str) -> Dict[str, Any]:
     }
     params = {"username_or_id_or_url": username}
 
-    r = requests.get(url, headers=headers, params=params, timeout=30)
+    r = safe_request(url, headers, params)
     r.raise_for_status()
     payload = r.json()
 
-    # Beklenen: payload["data"]["users"] -> [{username: "..."}]
     users = (payload.get("data") or {}).get("users") or []
     following = sorted([u.get("username") for u in users if isinstance(u, dict) and u.get("username")])
 
@@ -126,7 +142,7 @@ def main() -> None:
                     f"Zaman (UTC): {curr.get('fetched_at_utc')}"
                 )
                 print(f"[OK] First snapshot saved for {username}")
-                time.sleep(1)
+                time.sleep(2)
                 continue
 
             diff = diff_following(prev, curr)
@@ -151,11 +167,12 @@ def main() -> None:
             else:
                 print(f"[OK] No following change for {username}")
 
-            time.sleep(1)
+            time.sleep(2)
 
         except Exception as e:
             print(f"[ERROR] Failed for {username}: {e}")
 
+    telegram_send("✅ Tracker job tamamlandı — tüm hesaplar kontrol edildi.")
     print(f"--- Finished Tracker Job at {datetime.utcnow().isoformat()}Z ---")
 
 
