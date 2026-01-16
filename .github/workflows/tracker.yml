@@ -38,6 +38,8 @@ jobs:
           TARGET_USERNAMES: ${{ secrets.TARGET_USERNAMES }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
+          RAPIDAPI_HOST: ${{ secrets.RAPIDAPI_HOST }}
         run: |
           mkdir -p snapshots
           python src/main.py
