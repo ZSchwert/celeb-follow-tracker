@@ -3,7 +3,6 @@ name: Follow Tracker (Hourly)
 on:
   workflow_dispatch:
   schedule:
-    # Saat basi (UTC). TR saati fark etmez; GitHub UTC ile calisir.
     - cron: "0 * * * *"
 
 jobs:
@@ -19,7 +18,6 @@ jobs:
         with:
           python-version: "3.11"
 
-      # Snapshots klasorunu bir onceki run'dan geri yukle
       - name: Restore snapshots cache
         uses: actions/cache@v4
         with:
@@ -33,6 +31,7 @@ jobs:
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
+      # ✅ SAFE DEBUG (key'i yazmaz, sadece var mı + uzunluğu)
       - name: Debug env (safe)
         env:
           RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
@@ -40,9 +39,12 @@ jobs:
         run: |
           python - <<'PY'
           import os
-          print("RAPIDAPI_KEY set?:", bool(os.getenv("RAPIDAPI_KEY")))
-          print("RAPIDAPI_HOST set?:", bool(os.getenv("RAPIDAPI_HOST")))
-          print("RAPIDAPI_HOST value:", os.getenv("RAPIDAPI_HOST"))
+          key = (os.getenv("RAPIDAPI_KEY") or "")
+          host = (os.getenv("RAPIDAPI_HOST") or "")
+          print("RAPIDAPI_KEY set?:", bool(key.strip()))
+          print("RAPIDAPI_KEY length:", len(key.strip()))
+          print("RAPIDAPI_HOST set?:", bool(host.strip()))
+          print("RAPIDAPI_HOST value:", host.strip())
           PY
 
       - name: Run tracker
@@ -56,7 +58,6 @@ jobs:
           mkdir -p snapshots
           python src/main.py
 
-      # Run bittikten sonra snapshotlari cache'e tekrar yaz
       - name: Save snapshots cache
         uses: actions/cache@v4
         with:
