@@ -39,7 +39,9 @@ jobs:
           RAPIDAPI_HOST: ${{ secrets.RAPIDAPI_HOST }}
 
           # Batch ayarları:
-          BATCH_SIZE: "15"
+          BATCH_SIZE: "25"
+          PER_USER_SLEEP: "1.8"
+          RAPIDAPI_BACKOFF_BASE: "2.0"
           BATCH_SEED: ${{ github.run_number }}
 
           # Listeyi dosyadan alacağız (data/celebrities.txt)
