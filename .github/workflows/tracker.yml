@@ -32,11 +32,6 @@ jobs:
             instagrapi-settings-
 
       - name: Run tracker
-        run: |
-          echo "=== SHOW MAIN.PY HEAD ==="
-          sed -n '1,40p' src/main.py
-          echo "=== RUN ==="
-          python src/main.py
         env:
           TARGET_USERNAMES: ${{ secrets.TARGET_USERNAMES }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -44,7 +39,14 @@ jobs:
           IG_USERNAME: ${{ secrets.IG_USERNAME }}
           IG_PASSWORD: ${{ secrets.IG_PASSWORD }}
           BATCH_SIZE: "60"
-        run: python src/main.py
+        run: |
+          echo "=== HEAD of src/main.py ==="
+          sed -n '1,60p' src/main.py
+          echo "=== GREP RapidAPI ==="
+          grep -R "RAPIDAPI_KEY\|RAPIDAPI_HOST\|fetch_current_data" -n src || true
+          echo "=== RUN ==="
+          python src/main.py
+        
 
       # (Senin projende zaten varsa aynı bırak)
       - name: Commit changes
