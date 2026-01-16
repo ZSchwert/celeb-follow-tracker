@@ -1,4 +1,4 @@
-instaloader
+requests>=2.31.0
 tweepy
 python-dotenv
 schedule
