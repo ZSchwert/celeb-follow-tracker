@@ -193,3 +193,6 @@ def main() -> None:
             print(f"[ERROR] Failed for {username}: {e}")
 
     print(f"--- Finished Tracker Job at {datetime.utcnow().isoformat()}Z ---")
+
+if __name__ == "__main__":
+    main()
