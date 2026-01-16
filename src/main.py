@@ -18,24 +18,42 @@ def parse_targets(raw: str) -> List[str]:
 
 
 def load_targets_from_file(path: str) -> List[str]:
-    if not path or not os.path.exists(path):
+    if not path:
         return []
-    targets: List[str] = []
+    if not os.path.exists(path):
+        print(f"[ERROR] CELEB_FILE not found: {path}")
+        return []
+    out = []
     with open(path, "r", encoding="utf-8") as f:
         for line in f:
-            line = line.strip()
-            if not line or line.startswith("#"):
+            u = line.strip()
+            if not u or u.startswith("#"):
                 continue
-            targets.append(line)
-
+            # IG username'da boşluk olmaz -> boşluklu satırları düzelt/at
+            if " " in u:
+                u = u.replace(" ", "")
+            out.append(u)
+    # dedupe (sıra korunarak)
     seen = set()
     uniq = []
-    for t in targets:
-        if t not in seen:
-            uniq.append(t)
-            seen.add(t)
+    for u in out:
+        if u not in seen:
+            seen.add(u)
+            uniq.append(u)
     return uniq
 
+def select_rotating_batch(all_targets: List[str], batch_size: int, seed: int) -> List[str]:
+    if not all_targets:
+        return []
+    n = len(all_targets)
+    batch_size = max(1, min(batch_size, n))
+
+    start = (seed * batch_size) % n
+    end = start + batch_size
+    if end <= n:
+        return all_targets[start:end]
+    # wrap-around
+    return all_targets[start:] + all_targets[: end - n]
 
 def load_snapshot(username: str) -> Optional[Dict[str, Any]]:
     path = os.path.join(SNAP_DIR, f"{username}.json")
@@ -114,18 +132,26 @@ def fetch_current_data(username: str) -> Dict[str, Any]:
 
 
 def main() -> None:
+    # 1) Önce env'den dene
     targets = parse_targets(os.environ.get("TARGET_USERNAMES", ""))
 
-    if not targets:
-        celeb_file = os.environ.get("CELEB_FILE", "").strip()
+    # 2) Boşsa dosyadan oku
+    celeb_file = (os.environ.get("CELEB_FILE") or "").strip()
+    if not targets and celeb_file:
         targets = load_targets_from_file(celeb_file)
 
     if not targets:
-        print("[ERROR] No targets found. Set TARGET_USERNAMES or CELEB_FILE.")
+        print("[ERROR] TARGET_USERNAMES is empty and CELEB_FILE yielded no targets.")
         return
 
+    # 3) Rotating batch ayarları
+    batch_size = int(float(os.environ.get("BATCH_SIZE", "25")))
+    batch_seed = int(float(os.environ.get("BATCH_SEED", "0")))
+    targets = select_rotating_batch(targets, batch_size=batch_size, seed=batch_seed)
+
     print(f"--- Starting Tracker Job at {datetime.utcnow().isoformat()}Z ---")
-    print(f"Targets count: {len(targets)}")
+    print(f"Batch size: {batch_size} | Seed: {batch_seed}")
+    print(f"Targets in this run ({len(targets)}): {targets}")
 
     for username in targets:
         try:
@@ -147,19 +173,15 @@ def main() -> None:
 
             if diff["added"] or diff["removed"]:
                 save_snapshot(username, curr)
-
                 msg = f"🔔 @{username} takip listesi değişti\n"
                 msg += f"Following: {curr.get('following_count')}\n"
                 msg += f"Zaman (UTC): {curr.get('fetched_at_utc')}\n\n"
-
                 if diff["added"]:
                     msg += "➕ Takip etmeye başladı:\n"
                     msg += "\n".join(f"@{u}" for u in diff["added"]) + "\n\n"
-
                 if diff["removed"]:
                     msg += "➖ Takibi bıraktı:\n"
                     msg += "\n".join(f"@{u}" for u in diff["removed"])
-
                 telegram_send(msg)
                 print(f"[OK] Following changes detected and notified for {username}")
             else:
@@ -171,7 +193,3 @@ def main() -> None:
             print(f"[ERROR] Failed for {username}: {e}")
 
     print(f"--- Finished Tracker Job at {datetime.utcnow().isoformat()}Z ---")
-
-
-if __name__ == "__main__":
-    main()
