@@ -38,15 +38,14 @@ jobs:
           RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
           RAPIDAPI_HOST: ${{ secrets.RAPIDAPI_HOST }}
 
-          # Batch ayarlari (SECRET DEGIL)
           CELEB_FILE: "data/celebrities.txt"
-          BATCH_SIZE: "25"               # 50 yapma simdilik, 25 ile stabil olalim
+
+          BATCH_SIZE: "25"
           BATCH_SEED: ${{ github.run_number }}
 
-          # Rate limit yumusatma
           PER_USER_SLEEP: "1.2"
           RAPIDAPI_MAX_RETRIES: "6"
-          RAPIDAPI_BACKOFF_BASE: "1.8"
+          RAPIDAPI_BACKOFF_BASE: "1.5"
 
         run: |
           mkdir -p snapshots
