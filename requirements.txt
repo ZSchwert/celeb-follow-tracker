@@ -1,3 +1,4 @@
 instagrapi==2.1.2
-requests
+pydantic==2.7.1
+requests==2.32.5
 PySocks==1.7.1
