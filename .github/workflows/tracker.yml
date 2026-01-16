@@ -1,4 +1,4 @@
-name: Follow Tracker (Hourly - Rotating Batches)
+name: Follow Tracker (Hourly)
 
 on:
   workflow_dispatch:
@@ -31,22 +31,16 @@ jobs:
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      - name: Run tracker (rotating batch)
+      - name: Run tracker
         env:
+          TARGET_USERNAMES: ${{ secrets.TARGET_USERNAMES }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
           RAPIDAPI_HOST: ${{ secrets.RAPIDAPI_HOST }}
 
-          CELEB_FILE: "data/celebrities.txt"
-
-          BATCH_SIZE: "25"
-          BATCH_SEED: ${{ github.run_number }}
-
-          PER_USER_SLEEP: "1.2"
-          RAPIDAPI_MAX_RETRIES: "6"
-          RAPIDAPI_BACKOFF_BASE: "1.5"
-
+          # 429 yumuşatmak için (istersen 2.0 / 3.0 yap)
+          PER_USER_SLEEP: "1.5"
         run: |
           mkdir -p snapshots
           python src/main.py
