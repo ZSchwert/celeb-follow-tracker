@@ -1,21 +1,17 @@
 import os
 
-# Telegram
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
 
-# Hedef kullanıcılar
-TARGET_USERNAMES = os.getenv("TARGET_USERNAMES", "")
+TARGET_USERNAMES = os.getenv("TARGET_USERNAMES", "").strip()
 
-# Instagram Login (instagrapi)
-IG_USERNAME = os.getenv("IG_USERNAME", "")
-IG_PASSWORD = os.getenv("IG_PASSWORD", "")
+IG_USERNAME = os.getenv("IG_USERNAME", "").strip()
+IG_PASSWORD = os.getenv("IG_PASSWORD", "").strip()
 
-# 🚫 RapidAPI tamamen kapalı
-RAPIDAPI_KEY = ""
-RAPIDAPI_HOST = ""
+BATCH_SIZE = int(os.getenv("BATCH_SIZE", "60"))
+PER_USER_SLEEP = float(os.getenv("PER_USER_SLEEP", "1.0"))
 
 def assert_no_rapidapi():
-    # RapidAPI env set edilirse bile kullanımı yasakla
-    if os.getenv("RAPIDAPI_KEY") or os.getenv("RAPIDAPI_HOST"):
-        raise RuntimeError("RapidAPI is disabled. Remove RAPIDAPI_* from workflow/secrets.")
+    # RapidAPI kullanılmayacak. Env set edilmişse bile boşsa sorun yok.
+    if (os.getenv("RAPIDAPI_KEY") or "").strip() or (os.getenv("RAPIDAPI_HOST") or "").strip():
+        raise RuntimeError("RapidAPI is disabled. Remove RAPIDAPI_* from workflow/env.")
