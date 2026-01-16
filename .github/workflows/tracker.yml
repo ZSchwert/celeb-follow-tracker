@@ -30,7 +30,12 @@ jobs:
           restore-keys: |
             instagrapi-settings-
 
-      - name: Run tracker
+      - - name: Run tracker
+        run: |
+          echo "BRANCH:" && git branch --show-current
+          echo "COMMIT:" && git rev-parse HEAD
+          echo "HEAD src/main.py:" && sed -n '1,5p' src/main.py
+          python src/main.py
         env:
           TARGET_USERNAMES: ${{ secrets.TARGET_USERNAMES }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
