@@ -1,50 +1,49 @@
-name: Follow Tracker (Hourly)
+name: Instagram Following Tracker
 
 on:
-  workflow_dispatch:
   schedule:
     - cron: "0 * * * *"
+  workflow_dispatch:
 
 jobs:
-  track:
+  run:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # (İstersen bunu şimdilik kapatabilirsin; aşağıda "temiz run" kısmına bak)
-      - name: Restore snapshots cache
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # ✅ instagrapi settings/session cache
+      - name: Cache instagrapi session
         uses: actions/cache@v4
         with:
-          path: snapshots
-          key: snapshots-v1-${{ github.ref_name }}
+          path: data/ig_settings.json
+          key: instagrapi-settings-v1
           restore-keys: |
-            snapshots-v1-${{ github.ref_name }}
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+            instagrapi-settings-
 
       - name: Run tracker
         env:
           TARGET_USERNAMES: ${{ secrets.TARGET_USERNAMES }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
-          RAPIDAPI_HOST: ${{ secrets.RAPIDAPI_HOST }}
-        run: |
-          mkdir -p snapshots
-          python src/main.py
 
-      - name: Save snapshots cache
-        uses: actions/cache@v4
-        with:
-          path: snapshots
-          key: snapshots-v1-${{ github.ref_name }}
+          IG_USERNAME: ${{ secrets.IG_USERNAME }}
+          IG_PASSWORD: ${{ secrets.IG_PASSWORD }}
+
+          BATCH_SIZE: "60"
+        run: python src/main.py
+
+      # (Senin projende zaten varsa aynı bırak)
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add -A
+          git diff --cached --quiet || git commit -m "Update snapshots"
+          git push
