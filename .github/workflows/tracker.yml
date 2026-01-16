@@ -3,12 +3,13 @@ name: Follow Tracker (Hourly)
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 * * * *"  # Saat basi UTC
+    - cron: "0 * * * *"
 
 jobs:
   track:
     runs-on: ubuntu-latest
 
+    # <-- ENV’leri TEK YERDE tanımlıyoruz (en üstte) -->
     env:
       TARGET_USERNAMES: ${{ secrets.TARGET_USERNAMES }}
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -42,15 +43,16 @@ jobs:
         run: |
           python - <<'PY'
           import os
+
           def info(k):
-            v = os.getenv(k, "")
-            print(f"{k} set?:", bool(v.strip()), "| length:", len(v))
-          info("TARGET_USERNAMES")
-          info("TELEGRAM_BOT_TOKEN")
-          info("TELEGRAM_CHAT_ID")
+              v = os.getenv(k, "")
+              print(f"{k} set?:", bool(v.strip()), "| length:", len(v))
+
           info("RAPIDAPI_KEY")
           info("RAPIDAPI_HOST")
-          print("RAPIDAPI_HOST (masked preview):", (os.getenv("RAPIDAPI_HOST","")[:6] + "..." ) if os.getenv("RAPIDAPI_HOST") else "")
+          info("TELEGRAM_BOT_TOKEN")
+          info("TELEGRAM_CHAT_ID")
+          info("TARGET_USERNAMES")
           PY
 
       - name: Run tracker
