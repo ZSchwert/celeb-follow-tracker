@@ -33,6 +33,18 @@ jobs:
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
+      - name: Debug env (safe)
+        env:
+          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
+          RAPIDAPI_HOST: ${{ secrets.RAPIDAPI_HOST }}
+        run: |
+          python - <<'PY'
+          import os
+          print("RAPIDAPI_KEY set?:", bool(os.getenv("RAPIDAPI_KEY")))
+          print("RAPIDAPI_HOST set?:", bool(os.getenv("RAPIDAPI_HOST")))
+          print("RAPIDAPI_HOST value:", os.getenv("RAPIDAPI_HOST"))
+          PY
+
       - name: Run tracker
         env:
           TARGET_USERNAMES: ${{ secrets.TARGET_USERNAMES }}
