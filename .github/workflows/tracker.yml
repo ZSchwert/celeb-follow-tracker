@@ -30,12 +30,7 @@ jobs:
           restore-keys: |
             instagrapi-settings-
 
-      - - name: Run tracker
-        run: |
-          echo "BRANCH:" && git branch --show-current
-          echo "COMMIT:" && git rev-parse HEAD
-          echo "HEAD src/main.py:" && sed -n '1,5p' src/main.py
-          python src/main.py
+       - name: Run tracker
         env:
           TARGET_USERNAMES: ${{ secrets.TARGET_USERNAMES }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -43,8 +38,12 @@ jobs:
           IG_USERNAME: ${{ secrets.IG_USERNAME }}
           IG_PASSWORD: ${{ secrets.IG_PASSWORD }}
           BATCH_SIZE: "60"
-          PER_USER_SLEEP: "1.0"
-        run: python src/main.py
+        run: |
+          echo "BRANCH:" && git branch --show-current
+          echo "COMMIT:" && git rev-parse HEAD
+          echo "MAIN.PY HEAD:" && sed -n '1,15p' src/main.py
+          echo "RAPIDAPI GREP:" && grep -n "RAPIDAPI_KEY\|RAPIDAPI_HOST\|Targets (" -n src/main.py || true
+          python src/main.py
 
       - name: Commit changes
         run: |
