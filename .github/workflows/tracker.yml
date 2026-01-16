@@ -17,7 +17,11 @@ jobs:
 
       - name: Install dependencies
         run: pip install -r requirements.txt
-
+        
+       - name: Prepare folders
+        run: |
+          mkdir -p data state snapshots
+          
       # ✅ instagrapi settings/session cache
       - name: Cache instagrapi session
         uses: actions/cache@v4
