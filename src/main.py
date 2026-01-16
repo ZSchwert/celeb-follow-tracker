@@ -10,50 +10,28 @@ SNAP_DIR = "snapshots"
 
 
 def parse_targets(raw: str) -> List[str]:
+    """
+    TARGET_USERNAMES:
+    - satır satır (önerilen)
+    - veya virgülle: user1,user2
+    """
     if not raw:
         return []
     raw = raw.replace("\n", ",")
     parts = [p.strip() for p in raw.split(",")]
-    return [p for p in parts if p]
-
-
-def load_targets_from_file(path: str) -> List[str]:
-    if not path:
-        return []
-    if not os.path.exists(path):
-        print(f"[ERROR] CELEB_FILE not found: {path}")
-        return []
-    out = []
-    with open(path, "r", encoding="utf-8") as f:
-        for line in f:
-            u = line.strip()
-            if not u or u.startswith("#"):
-                continue
-            # IG username'da boşluk olmaz -> boşluklu satırları düzelt/at
-            if " " in u:
-                u = u.replace(" ", "")
-            out.append(u)
-    # dedupe (sıra korunarak)
+    # boşları at, tekrarları temizle (sıra korunarak)
     seen = set()
-    uniq = []
-    for u in out:
-        if u not in seen:
-            seen.add(u)
-            uniq.append(u)
-    return uniq
+    out = []
+    for p in parts:
+        if not p:
+            continue
+        # IG username boşluk içermez; kazara boşluk varsa sil
+        p = p.replace(" ", "")
+        if p and p not in seen:
+            seen.add(p)
+            out.append(p)
+    return out
 
-def select_rotating_batch(all_targets: List[str], batch_size: int, seed: int) -> List[str]:
-    if not all_targets:
-        return []
-    n = len(all_targets)
-    batch_size = max(1, min(batch_size, n))
-
-    start = (seed * batch_size) % n
-    end = start + batch_size
-    if end <= n:
-        return all_targets[start:end]
-    # wrap-around
-    return all_targets[start:] + all_targets[: end - n]
 
 def load_snapshot(username: str) -> Optional[Dict[str, Any]]:
     path = os.path.join(SNAP_DIR, f"{username}.json")
@@ -121,7 +99,9 @@ def fetch_current_data(username: str) -> Dict[str, Any]:
     payload = r.json()
 
     users = (payload.get("data") or {}).get("users") or []
-    following = sorted([u.get("username") for u in users if isinstance(u, dict) and u.get("username")])
+    following = sorted(
+        [u.get("username") for u in users if isinstance(u, dict) and u.get("username")]
+    )
 
     return {
         "username": username,
@@ -132,26 +112,16 @@ def fetch_current_data(username: str) -> Dict[str, Any]:
 
 
 def main() -> None:
-    # 1) Önce env'den dene
     targets = parse_targets(os.environ.get("TARGET_USERNAMES", ""))
 
-    # 2) Boşsa dosyadan oku
-    celeb_file = (os.environ.get("CELEB_FILE") or "").strip()
-    if not targets and celeb_file:
-        targets = load_targets_from_file(celeb_file)
-
     if not targets:
-        print("[ERROR] TARGET_USERNAMES is empty and CELEB_FILE yielded no targets.")
+        print("[ERROR] TARGET_USERNAMES is empty.")
         return
 
-    # 3) Rotating batch ayarları
-    batch_size = int(float(os.environ.get("BATCH_SIZE", "25")))
-    batch_seed = int(float(os.environ.get("BATCH_SEED", "0")))
-    targets = select_rotating_batch(targets, batch_size=batch_size, seed=batch_seed)
+    per_user_sleep = float(os.environ.get("PER_USER_SLEEP", "1.5"))
 
     print(f"--- Starting Tracker Job at {datetime.utcnow().isoformat()}Z ---")
-    print(f"Batch size: {batch_size} | Seed: {batch_seed}")
-    print(f"Targets in this run ({len(targets)}): {targets}")
+    print(f"Targets ({len(targets)}): {targets}")
 
     for username in targets:
         try:
@@ -166,33 +136,36 @@ def main() -> None:
                     f"Zaman (UTC): {curr.get('fetched_at_utc')}"
                 )
                 print(f"[OK] First snapshot saved for {username}")
-                time.sleep(float(os.environ.get("PER_USER_SLEEP", "1.2")))
-                continue
-
-            diff = diff_following(prev, curr)
-
-            if diff["added"] or diff["removed"]:
-                save_snapshot(username, curr)
-                msg = f"🔔 @{username} takip listesi değişti\n"
-                msg += f"Following: {curr.get('following_count')}\n"
-                msg += f"Zaman (UTC): {curr.get('fetched_at_utc')}\n\n"
-                if diff["added"]:
-                    msg += "➕ Takip etmeye başladı:\n"
-                    msg += "\n".join(f"@{u}" for u in diff["added"]) + "\n\n"
-                if diff["removed"]:
-                    msg += "➖ Takibi bıraktı:\n"
-                    msg += "\n".join(f"@{u}" for u in diff["removed"])
-                telegram_send(msg)
-                print(f"[OK] Following changes detected and notified for {username}")
             else:
-                print(f"[OK] No following change for {username}")
+                diff = diff_following(prev, curr)
 
-            time.sleep(float(os.environ.get("PER_USER_SLEEP", "1.2")))
+                if diff["added"] or diff["removed"]:
+                    save_snapshot(username, curr)
+
+                    msg = f"🔔 @{username} takip listesi değişti\n"
+                    msg += f"Following: {curr.get('following_count')}\n"
+                    msg += f"Zaman (UTC): {curr.get('fetched_at_utc')}\n\n"
+
+                    if diff["added"]:
+                        msg += "➕ Takip etmeye başladı:\n"
+                        msg += "\n".join(f"@{u}" for u in diff["added"]) + "\n\n"
+
+                    if diff["removed"]:
+                        msg += "➖ Takibi bıraktı:\n"
+                        msg += "\n".join(f"@{u}" for u in diff["removed"])
+
+                    telegram_send(msg)
+                    print(f"[OK] Following changes detected and notified for {username}")
+                else:
+                    print(f"[OK] No following change for {username}")
 
         except Exception as e:
             print(f"[ERROR] Failed for {username}: {e}")
 
+        time.sleep(per_user_sleep)
+
     print(f"--- Finished Tracker Job at {datetime.utcnow().isoformat()}Z ---")
+
 
 if __name__ == "__main__":
     main()
