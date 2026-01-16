@@ -1,4 +1,4 @@
-name: Follow Tracker (Hourly)
+name: Follow Tracker (Hourly - Rotating Batches)
 
 on:
   workflow_dispatch:
@@ -8,14 +8,6 @@ on:
 jobs:
   track:
     runs-on: ubuntu-latest
-
-    # <-- ENV’leri TEK YERDE tanımlıyoruz (en üstte) -->
-    env:
-      TARGET_USERNAMES: ${{ secrets.TARGET_USERNAMES }}
-      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-      RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
-      RAPIDAPI_HOST: ${{ secrets.RAPIDAPI_HOST }}
 
     steps:
       - name: Checkout repo
@@ -39,23 +31,25 @@ jobs:
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      - name: Debug env (safe)
-        run: |
-          python - <<'PY'
-          import os
+      - name: Run tracker (rotating batch)
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
+          RAPIDAPI_HOST: ${{ secrets.RAPIDAPI_HOST }}
 
-          def info(k):
-              v = os.getenv(k, "")
-              print(f"{k} set?:", bool(v.strip()), "| length:", len(v))
+          # Batch ayarları:
+          BATCH_SIZE: "15"
+          BATCH_SEED: ${{ github.run_number }}
 
-          info("RAPIDAPI_KEY")
-          info("RAPIDAPI_HOST")
-          info("TELEGRAM_BOT_TOKEN")
-          info("TELEGRAM_CHAT_ID")
-          info("TARGET_USERNAMES")
-          PY
+          # Listeyi dosyadan alacağız (data/celebrities.txt)
+          CELEB_FILE: "data/celebrities.txt"
 
-      - name: Run tracker
+          # Rate limit yumuşatma:
+          PER_USER_SLEEP: "1.2"
+          RAPIDAPI_MAX_RETRIES: "6"
+          RAPIDAPI_BACKOFF_BASE: "1.5"
+
         run: |
           mkdir -p snapshots
           python src/main.py
