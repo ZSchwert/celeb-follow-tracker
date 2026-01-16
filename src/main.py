@@ -1,8 +1,9 @@
+print("✅ NEW INSTAGRAPI MAIN ACTIVE")
 import os
 import json
 import time
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set
 
 import requests
 
@@ -19,15 +20,11 @@ COUNTS_PATH = os.path.join("data", "following_counts.json")
 
 
 def parse_targets(raw: str) -> List[str]:
-    """
-    TARGET_USERNAMES:
-    - satır satır (önerilen)
-    - veya virgülle: user1,user2
-    """
     if not raw:
         return []
     raw = raw.replace("\n", ",")
     parts = [p.strip() for p in raw.split(",")]
+
     seen = set()
     out = []
     for p in parts:
@@ -67,7 +64,11 @@ def telegram_send(message: str) -> None:
         return
 
     url = f"https://api.telegram.org/bot{token}/sendMessage"
-    payload = {"chat_id": chat_id, "text": message, "disable_web_page_preview": True}
+    payload = {
+        "chat_id": chat_id,
+        "text": message,
+        "disable_web_page_preview": True,
+    }
 
     try:
         r = requests.post(url, json=payload, timeout=20)
@@ -116,13 +117,14 @@ def build_snapshot(username: str, following: Set[str]) -> Dict[str, Any]:
 
 
 def main() -> None:
+    print("✅ NEW INSTAGRAPI MAIN ACTIVE")
+
     targets = parse_targets(os.environ.get("TARGET_USERNAMES", ""))
 
     if not targets:
         print("[ERROR] TARGET_USERNAMES is empty.")
         return
 
-    # ✅ 1000 hedef için: her run'da batch çalış
     batch_size = int(os.environ.get("BATCH_SIZE", "60"))
     cursor = load_cursor()
     batch, next_cursor = take_batch(targets, cursor, batch_size)
@@ -131,10 +133,13 @@ def main() -> None:
     per_user_sleep = float(os.environ.get("PER_USER_SLEEP", "1.0"))
 
     print(f"--- Starting Tracker Job at {datetime.utcnow().isoformat()}Z ---")
-    print(f"Total targets: {len(targets)} | Batch size: {batch_size} | Cursor: {cursor} -> {next_cursor}")
+    print(
+        f"Total targets: {len(targets)} | "
+        f"Batch size: {batch_size} | "
+        f"Cursor: {cursor} -> {next_cursor}"
+    )
     print(f"Batch targets ({len(batch)}): {batch}")
 
-    # ✅ instagrapi client (cache settings ile)
     try:
         cl = get_client()
     except Exception as e:
@@ -146,17 +151,16 @@ def main() -> None:
 
     for i, username in enumerate(batch):
         try:
-            # 1) Ucuz kontrol: following_count
             user_pk, new_count = get_user_pk_and_following_count(cl, username)
             old_count = counts.get(username)
 
-            # Count hiç değişmemişse: SKIP
             if old_count is not None and old_count == new_count:
-                print(f"[OK] No count change for {username} (still {new_count}) -> skip full list")
+                print(
+                    f"[OK] No count change for {username} (still {new_count}) -> skip full list"
+                )
                 time.sleep(per_user_sleep)
                 continue
 
-            # 2) Count değiştiyse: full following list çek
             following = fetch_following_usernames(cl, user_pk)
             curr = build_snapshot(username, following)
             prev = load_snapshot(username)
@@ -187,18 +191,17 @@ def main() -> None:
                         msg += "\n".join(f"@{u}" for u in diff["removed"])
 
                     telegram_send(msg)
-                    print(f"[OK] Following changes detected and notified for {username}")
+                    print(
+                        f"[OK] Following changes detected and notified for {username}"
+                    )
                 else:
                     print(f"[OK] Count changed but no diff (?) for {username}")
 
-            # counts güncelle
             counts[username] = int(new_count)
 
-            # bot gibi görünmemek için küçük jitter
             polite_sleep(i)
 
         except Exception as e:
-            # ✅ Fail-safe: sessizce değil, uyarı atsın (çok spam olmasın diye kısa tut)
             telegram_send(f"⚠️ Tracker error @{username}: {e}")
             print(f"[ERROR] Failed for {username}: {e}")
 
