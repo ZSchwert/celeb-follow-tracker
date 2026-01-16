@@ -2,11 +2,20 @@ import os
 import json
 import time
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import requests
 
+from src.cursor import load_cursor, save_cursor, take_batch
+from src.providers.instagrapi_provider import (
+    get_client,
+    get_user_pk_and_following_count,
+    fetch_following_usernames,
+    polite_sleep,
+)
+
 SNAP_DIR = "snapshots"
+COUNTS_PATH = os.path.join("data", "following_counts.json")
 
 
 def parse_targets(raw: str) -> List[str]:
@@ -19,13 +28,11 @@ def parse_targets(raw: str) -> List[str]:
         return []
     raw = raw.replace("\n", ",")
     parts = [p.strip() for p in raw.split(",")]
-    # boşları at, tekrarları temizle (sıra korunarak)
     seen = set()
     out = []
     for p in parts:
         if not p:
             continue
-        # IG username boşluk içermez; kazara boşluk varsa sil
         p = p.replace(" ", "")
         if p and p not in seen:
             seen.add(p)
@@ -80,34 +87,31 @@ def diff_following(prev: Dict[str, Any], curr: Dict[str, Any]) -> Dict[str, List
     return {"added": added, "removed": removed}
 
 
-def fetch_current_data(username: str) -> Dict[str, Any]:
-    api_key = (os.environ.get("RAPIDAPI_KEY") or "").strip()
-    api_host = (os.environ.get("RAPIDAPI_HOST") or "").strip()
+def load_counts() -> Dict[str, int]:
+    os.makedirs("data", exist_ok=True)
+    if not os.path.exists(COUNTS_PATH):
+        return {}
+    try:
+        with open(COUNTS_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return {k: int(v) for k, v in data.items()}
+    except Exception:
+        return {}
 
-    if not api_key or not api_host:
-        raise RuntimeError("RAPIDAPI_KEY or RAPIDAPI_HOST missing")
 
-    url = f"https://{api_host}/user/following"
-    headers = {
-        "x-rapidapi-key": api_key,
-        "x-rapidapi-host": api_host,
-    }
-    params = {"username_or_id_or_url": username}
+def save_counts(counts: Dict[str, int]) -> None:
+    os.makedirs("data", exist_ok=True)
+    with open(COUNTS_PATH, "w", encoding="utf-8") as f:
+        json.dump(counts, f, ensure_ascii=False, indent=2)
 
-    r = requests.get(url, headers=headers, params=params, timeout=30)
-    r.raise_for_status()
-    payload = r.json()
 
-    users = (payload.get("data") or {}).get("users") or []
-    following = sorted(
-        [u.get("username") for u in users if isinstance(u, dict) and u.get("username")]
-    )
-
+def build_snapshot(username: str, following: Set[str]) -> Dict[str, Any]:
+    following_list = sorted(list(following))
     return {
         "username": username,
         "fetched_at_utc": datetime.utcnow().isoformat() + "Z",
-        "following": following,
-        "following_count": len(following),
+        "following": following_list,
+        "following_count": len(following_list),
     }
 
 
@@ -118,14 +122,43 @@ def main() -> None:
         print("[ERROR] TARGET_USERNAMES is empty.")
         return
 
-    per_user_sleep = float(os.environ.get("PER_USER_SLEEP", "1.5"))
+    # ✅ 1000 hedef için: her run'da batch çalış
+    batch_size = int(os.environ.get("BATCH_SIZE", "60"))
+    cursor = load_cursor()
+    batch, next_cursor = take_batch(targets, cursor, batch_size)
+    save_cursor(next_cursor)
+
+    per_user_sleep = float(os.environ.get("PER_USER_SLEEP", "1.0"))
 
     print(f"--- Starting Tracker Job at {datetime.utcnow().isoformat()}Z ---")
-    print(f"Targets ({len(targets)}): {targets}")
+    print(f"Total targets: {len(targets)} | Batch size: {batch_size} | Cursor: {cursor} -> {next_cursor}")
+    print(f"Batch targets ({len(batch)}): {batch}")
 
-    for username in targets:
+    # ✅ instagrapi client (cache settings ile)
+    try:
+        cl = get_client()
+    except Exception as e:
+        telegram_send(f"⚠️ Tracker error: IG login failed: {e}")
+        print(f"[ERROR] IG login failed: {e}")
+        return
+
+    counts = load_counts()
+
+    for i, username in enumerate(batch):
         try:
-            curr = fetch_current_data(username)
+            # 1) Ucuz kontrol: following_count
+            user_pk, new_count = get_user_pk_and_following_count(cl, username)
+            old_count = counts.get(username)
+
+            # Count hiç değişmemişse: SKIP
+            if old_count is not None and old_count == new_count:
+                print(f"[OK] No count change for {username} (still {new_count}) -> skip full list")
+                time.sleep(per_user_sleep)
+                continue
+
+            # 2) Count değiştiyse: full following list çek
+            following = fetch_following_usernames(cl, user_pk)
+            curr = build_snapshot(username, following)
             prev = load_snapshot(username)
 
             if prev is None:
@@ -138,7 +171,6 @@ def main() -> None:
                 print(f"[OK] First snapshot saved for {username}")
             else:
                 diff = diff_following(prev, curr)
-
                 if diff["added"] or diff["removed"]:
                     save_snapshot(username, curr)
 
@@ -157,13 +189,22 @@ def main() -> None:
                     telegram_send(msg)
                     print(f"[OK] Following changes detected and notified for {username}")
                 else:
-                    print(f"[OK] No following change for {username}")
+                    print(f"[OK] Count changed but no diff (?) for {username}")
+
+            # counts güncelle
+            counts[username] = int(new_count)
+
+            # bot gibi görünmemek için küçük jitter
+            polite_sleep(i)
 
         except Exception as e:
+            # ✅ Fail-safe: sessizce değil, uyarı atsın (çok spam olmasın diye kısa tut)
+            telegram_send(f"⚠️ Tracker error @{username}: {e}")
             print(f"[ERROR] Failed for {username}: {e}")
 
         time.sleep(per_user_sleep)
 
+    save_counts(counts)
     print(f"--- Finished Tracker Job at {datetime.utcnow().isoformat()}Z ---")
 
 
