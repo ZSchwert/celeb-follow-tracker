@@ -58,39 +58,47 @@ def telegram_send(message: str) -> None:
         print(f"[WARN] Telegram exception: {e}")
 
 
-def diff_dict(prev: Dict[str, Any], curr: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Basit bir diff: degisen alanlari raporlar.
-    (Takip listesi gibi buyuk alanlar varsa, onu ayrı mantikla diff etmek daha iyi.)
-    """
-    changes = {}
-    keys = set(prev.keys()) | set(curr.keys())
-    for k in sorted(keys):
-        pv = prev.get(k, None)
-        cv = curr.get(k, None)
-        if pv != cv:
-            changes[k] = {"before": pv, "after": cv}
-    return changes
+def diff_following(prev: Dict[str, Any], curr: Dict[str, Any]) -> Dict[str, List[str]]:
+    prev_set = set(prev.get("following", []) or [])
+    curr_set = set(curr.get("following", []) or [])
+
+    added = sorted(curr_set - prev_set)
+    removed = sorted(prev_set - curr_set)
+
+    return {"added": added, "removed": removed}
 
 
 def fetch_current_data(username: str) -> Dict[str, Any]:
     """
-    BURASI 'data kaynagi' noktasi.
-
-    - Eğer repo içinde zaten bir instagram_client / scraper varsa, onu burada kullan.
-    - Ben burada Instagram korumalarini aşan/private endpoint kodu vermiyorum.
-    - Bu fonksiyonun tek görevi: username için "o anki datayı" döndürmek.
-
-    Örnek olarak sadece timestamp + username dönüyorum.
-    Sen burayı kendi çalışan modülünle dolduracaksın.
+    RapidAPI: Instagram Master API 2025
+    Endpoint: /user/following?username_or_id_or_url=<username>
     """
+    api_key = (os.environ.get("RAPIDAPI_KEY") or "").strip()
+    api_host = (os.environ.get("RAPIDAPI_HOST") or "").strip()
+
+    if not api_key or not api_host:
+        raise RuntimeError("RAPIDAPI_KEY or RAPIDAPI_HOST missing")
+
+    url = f"https://{api_host}/user/following"
+    headers = {
+        "x-rapidapi-key": api_key,
+        "x-rapidapi-host": api_host,
+    }
+    params = {"username_or_id_or_url": username}
+
+    r = requests.get(url, headers=headers, params=params, timeout=30)
+    r.raise_for_status()
+    payload = r.json()
+
+    # Beklenen: payload["data"]["users"] -> [{username: "..."}]
+    users = (payload.get("data") or {}).get("users") or []
+    following = sorted([u.get("username") for u in users if isinstance(u, dict) and u.get("username")])
+
     return {
         "username": username,
         "fetched_at_utc": datetime.utcnow().isoformat() + "Z",
-        # Buraya senin ürettiğin alanlar gelecek:
-        # "following": [...],
-        # "followers_count": 123,
-        # "following_count": 456,
+        "following": following,
+        "following_count": len(following),
     }
 
 
@@ -107,31 +115,42 @@ def main() -> None:
     for username in targets:
         try:
             curr = fetch_current_data(username)
-
             prev = load_snapshot(username)
+
+            # İlk kez çalışıyorsa snapshot al
             if prev is None:
                 save_snapshot(username, curr)
                 telegram_send(
                     f"✅ İlk snapshot alındı: @{username}\n"
+                    f"Following: {curr.get('following_count')}\n"
                     f"Zaman (UTC): {curr.get('fetched_at_utc')}"
                 )
                 print(f"[OK] First snapshot saved for {username}")
+                time.sleep(1)
                 continue
 
-            changes = diff_dict(prev, curr)
-            if changes:
-                save_snapshot(username, curr)
-                msg = (
-                    f"🔔 Değişiklik var: @{username}\n"
-                    f"Zaman (UTC): {curr.get('fetched_at_utc')}\n\n"
-                    f"Değişen alanlar:\n{json.dumps(changes, ensure_ascii=False, indent=2)}"
-                )
-                telegram_send(msg)
-                print(f"[OK] Changes detected and notified for {username}")
-            else:
-                print(f"[OK] No change for {username}")
+            diff = diff_following(prev, curr)
 
-            # küçük bekleme (rate-limit vs. varsa iyi gelir)
+            if diff["added"] or diff["removed"]:
+                save_snapshot(username, curr)
+
+                msg = f"🔔 @{username} takip listesi değişti\n"
+                msg += f"Following: {curr.get('following_count')}\n"
+                msg += f"Zaman (UTC): {curr.get('fetched_at_utc')}\n\n"
+
+                if diff["added"]:
+                    msg += "➕ Takip etmeye başladı:\n"
+                    msg += "\n".join(f"@{u}" for u in diff["added"]) + "\n\n"
+
+                if diff["removed"]:
+                    msg += "➖ Takibi bıraktı:\n"
+                    msg += "\n".join(f"@{u}" for u in diff["removed"])
+
+                telegram_send(msg)
+                print(f"[OK] Following changes detected and notified for {username}")
+            else:
+                print(f"[OK] No following change for {username}")
+
             time.sleep(1)
 
         except Exception as e:
