@@ -18,13 +18,14 @@ jobs:
         with:
           python-version: "3.11"
 
+      # (İstersen bunu şimdilik kapatabilirsin; aşağıda "temiz run" kısmına bak)
       - name: Restore snapshots cache
         uses: actions/cache@v4
         with:
           path: snapshots
-          key: snapshots-${{ github.ref_name }}-${{ github.run_id }}
+          key: snapshots-v1-${{ github.ref_name }}
           restore-keys: |
-            snapshots-${{ github.ref_name }}-
+            snapshots-v1-${{ github.ref_name }}
 
       - name: Install dependencies
         run: |
@@ -38,9 +39,6 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
           RAPIDAPI_HOST: ${{ secrets.RAPIDAPI_HOST }}
-
-          # 429 yumuşatmak için (istersen 2.0 / 3.0 yap)
-          PER_USER_SLEEP: "1.5"
         run: |
           mkdir -p snapshots
           python src/main.py
@@ -49,4 +47,4 @@ jobs:
         uses: actions/cache@v4
         with:
           path: snapshots
-          key: snapshots-${{ github.ref_name }}-${{ github.run_id }}
+          key: snapshots-v1-${{ github.ref_name }}
