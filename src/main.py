@@ -7,6 +7,9 @@ from typing import Any, Dict, List, Optional, Set
 
 import requests
 
+from src.config import assert_no_rapidapi
+assert_no_rapidapi()
+
 from src.cursor import load_cursor, save_cursor, take_batch
 from src.providers.instagrapi_provider import (
     get_client,
