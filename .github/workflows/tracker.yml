@@ -1,179 +1,49 @@
-import os
-import json
-import time
-from datetime import datetime
-from typing import Any, Dict, List, Optional, Set
+name: Instagram Following Tracker
 
-import requests
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
 
-from src.config import (
-    assert_no_rapidapi,
-    TARGET_USERNAMES,
-    TELEGRAM_BOT_TOKEN,
-    TELEGRAM_CHAT_ID,
-    BATCH_SIZE,
-    PER_USER_SLEEP,
-)
-from src.cursor import load_cursor, save_cursor, take_batch
-from src.providers.instagrapi_provider import (
-    get_client,
-    get_user_pk_and_following_count,
-    fetch_following_usernames,
-    polite_sleep,
-)
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
-assert_no_rapidapi()
+    steps:
+      - uses: actions/checkout@v4
 
-SNAP_DIR = "snapshots"
-COUNTS_PATH = os.path.join("data", "following_counts.json")
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
+      - name: Install dependencies
+        run: pip install -r requirements.txt
 
-def parse_targets(raw: str) -> List[str]:
-    if not raw:
-        return []
-    raw = raw.replace("\n", ",")
-    parts = [p.strip() for p in raw.split(",")]
-    seen = set()
-    out = []
-    for p in parts:
-        if not p:
-            continue
-        p = p.replace(" ", "")
-        if p and p not in seen:
-            seen.add(p)
-            out.append(p)
-    return out
+      - name: Cache instagrapi session
+        uses: actions/cache@v4
+        with:
+          path: data/ig_settings.json
+          key: instagrapi-settings-v1
+          restore-keys: |
+            instagrapi-settings-
 
+      - name: Run tracker
+        env:
+          TARGET_USERNAMES: ${{ secrets.TARGET_USERNAMES }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          IG_USERNAME: ${{ secrets.IG_USERNAME }}
+          IG_PASSWORD: ${{ secrets.IG_PASSWORD }}
+          BATCH_SIZE: "30"
+          PER_USER_SLEEP: "1.0"
+        run: python src/main.py
 
-def load_snapshot(username: str) -> Optional[Dict[str, Any]]:
-    path = os.path.join(SNAP_DIR, f"{username}.json")
-    if not os.path.exists(path):
-        return None
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return None
-
-
-def save_snapshot(username: str, data: Dict[str, Any]) -> None:
-    os.makedirs(SNAP_DIR, exist_ok=True)
-    path = os.path.join(SNAP_DIR, f"{username}.json")
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-
-def telegram_send(message: str) -> None:
-    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-        print("[WARN] Telegram env missing. Skipping notify.")
-        return
-
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "disable_web_page_preview": True}
-    try:
-        r = requests.post(url, json=payload, timeout=20)
-        if r.status_code != 200:
-            print(f"[WARN] Telegram send failed: {r.status_code} {r.text}")
-    except Exception as e:
-        print(f"[WARN] Telegram exception: {e}")
-
-
-def diff_following(prev: Dict[str, Any], curr: Dict[str, Any]) -> Dict[str, List[str]]:
-    prev_set = set(prev.get("following", []) or [])
-    curr_set = set(curr.get("following", []) or [])
-    return {
-        "added": sorted(curr_set - prev_set),
-        "removed": sorted(prev_set - curr_set),
-    }
-
-
-def load_counts() -> Dict[str, int]:
-    os.makedirs("data", exist_ok=True)
-    if not os.path.exists(COUNTS_PATH):
-        return {}
-    try:
-        with open(COUNTS_PATH, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return {k: int(v) for k, v in data.items()}
-    except Exception:
-        return {}
-
-
-def save_counts(counts: Dict[str, int]) -> None:
-    os.makedirs("data", exist_ok=True)
-    with open(COUNTS_PATH, "w", encoding="utf-8") as f:
-        json.dump(counts, f, ensure_ascii=False, indent=2)
-
-
-def build_snapshot(username: str, following: Set[str]) -> Dict[str, Any]:
-    fl = sorted(list(following))
-    return {
-        "username": username,
-        "fetched_at_utc": datetime.utcnow().isoformat() + "Z",
-        "following": fl,
-        "following_count": len(fl),
-    }
-
-
-def main() -> None:
-    print("✅ NEW INSTAGRAPI MAIN ACTIVE")
-
-    targets = parse_targets(TARGET_USERNAMES)
-    if not targets:
-        print("[ERROR] TARGET_USERNAMES is empty.")
-        return
-
-    cursor = load_cursor()
-    batch, next_cursor = take_batch(targets, cursor, BATCH_SIZE)
-    save_cursor(next_cursor)
-
-    print(f"--- Starting Tracker Job at {datetime.utcnow().isoformat()}Z ---")
-    print(f"Total targets: {len(targets)} | Batch size: {BATCH_SIZE} | Cursor: {cursor} -> {next_cursor}")
-    print(f"Batch targets ({len(batch)}): {batch}")
-
-    cl = get_client()
-    counts = load_counts()
-
-    for i, username in enumerate(batch):
-        try:
-            user_pk, new_count = get_user_pk_and_following_count(cl, username)
-            old_count = counts.get(username)
-
-            if old_count is not None and old_count == new_count:
-                print(f"[OK] No count change for {username} (still {new_count}) -> skip full list")
-                time.sleep(PER_USER_SLEEP)
-                continue
-
-            following = fetch_following_usernames(cl, user_pk)
-            curr = build_snapshot(username, following)
-            prev = load_snapshot(username)
-
-            if prev is None:
-                save_snapshot(username, curr)
-                telegram_send(f"✅ İlk snapshot alındı: @{username}\nFollowing: {curr['following_count']}")
-            else:
-                diff = diff_following(prev, curr)
-                if diff["added"] or diff["removed"]:
-                    save_snapshot(username, curr)
-                    msg = f"🔔 @{username} takip listesi değişti\nFollowing: {curr['following_count']}\n\n"
-                    if diff["added"]:
-                        msg += "➕ Takip etmeye başladı:\n" + "\n".join(f"@{u}" for u in diff["added"]) + "\n\n"
-                    if diff["removed"]:
-                        msg += "➖ Takibi bıraktı:\n" + "\n".join(f"@{u}" for u in diff["removed"])
-                    telegram_send(msg)
-
-            counts[username] = int(new_count)
-            polite_sleep(i)
-
-        except Exception as e:
-            telegram_send(f"⚠️ Tracker error @{username}: {e}")
-            print(f"[ERROR] Failed for {username}: {e}")
-
-        time.sleep(PER_USER_SLEEP)
-
-    save_counts(counts)
-    print(f"--- Finished Tracker Job at {datetime.utcnow().isoformat()}Z ---")
-
-
-if __name__ == "__main__":
-    main()
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add -A
+          git diff --cached --quiet || git commit -m "Update snapshots"
+          git push
