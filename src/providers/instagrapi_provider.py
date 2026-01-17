@@ -1,35 +1,63 @@
 import os
-import json
-from typing import List, Tuple
+import time
+from typing import Dict, Set, Tuple
 
-STATE_PATH = os.path.join("state", "cursor.json")
+from instagrapi import Client
 
-def _ensure_state_dir():
-    os.makedirs("state", exist_ok=True)
+SETTINGS_PATH = os.path.join("data", "ig_settings.json")
 
-def load_cursor() -> int:
-    _ensure_state_dir()
-    if not os.path.exists(STATE_PATH):
-        return 0
+
+def _ensure_dirs() -> None:
+    os.makedirs("data", exist_ok=True)
+
+
+def get_client() -> Client:
+    _ensure_dirs()
+
+    ig_user = os.getenv("IG_USERNAME", "").strip()
+    ig_pass = os.getenv("IG_PASSWORD", "").strip()
+    if not ig_user or not ig_pass:
+        raise RuntimeError("IG_USERNAME / IG_PASSWORD env boş. GitHub Secrets ekleyin.")
+
+    cl = Client()
+
+    # cached settings varsa yükle
+    if os.path.exists(SETTINGS_PATH):
+        try:
+            cl.load_settings(SETTINGS_PATH)
+        except Exception:
+            pass
+
+    # login
     try:
-        with open(STATE_PATH, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return int(data.get("cursor", 0))
+        cl.login(ig_user, ig_pass)
     except Exception:
-        return 0
+        cl = Client()
+        cl.login(ig_user, ig_pass)
 
-def save_cursor(cursor: int) -> None:
-    _ensure_state_dir()
-    with open(STATE_PATH, "w", encoding="utf-8") as f:
-        json.dump({"cursor": int(cursor)}, f, ensure_ascii=False, indent=2)
+    # settings dump
+    try:
+        cl.dump_settings(SETTINGS_PATH)
+    except Exception:
+        pass
 
-def take_batch(targets: List[str], cursor: int, batch_size: int) -> Tuple[List[str], int]:
-    if not targets:
-        return [], 0
-    n = len(targets)
-    cursor = max(0, min(cursor, n))
-    batch = targets[cursor: cursor + batch_size]
-    next_cursor = cursor + batch_size
-    if next_cursor >= n:
-        next_cursor = 0
-    return batch, next_cursor
+    return cl
+
+
+def get_user_pk_and_following_count(cl: Client, username: str) -> Tuple[int, int]:
+    info = cl.user_info_by_username(username)
+    return info.pk, int(info.following_count)
+
+
+def fetch_following_usernames(cl: Client, user_pk: int) -> Set[str]:
+    data: Dict[int, object] = cl.user_following(user_pk, amount=0)
+    usernames: Set[str] = set()
+    for u in data.values():
+        uname = getattr(u, "username", None)
+        if uname:
+            usernames.add(str(uname))
+    return usernames
+
+
+def polite_sleep(i: int) -> None:
+    time.sleep(1.0 + (i % 5) * 0.2)
