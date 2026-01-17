@@ -29,7 +29,18 @@ jobs:
           restore-keys: |
             instagrapi-settings-
 
-      - name: Run tracker
+      - name: Run tracker (prove commit)
+        run: |
+          echo "BRANCH:"
+          git rev-parse --abbrev-ref HEAD
+          echo "COMMIT:"
+          git rev-parse HEAD
+          echo "SHOW main.py first 40 lines:"
+          sed -n '1,40p' src/main.py
+          echo "SEARCH RapidAPI missing string:"
+          grep -Rni "RAPIDAPI_KEY or RAPIDAPI_HOST missing" . || true
+          echo "RUN:"
+          python src/main.py
         env:
           TARGET_USERNAMES: ${{ secrets.TARGET_USERNAMES }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -38,8 +49,6 @@ jobs:
           IG_PASSWORD: ${{ secrets.IG_PASSWORD }}
           BATCH_SIZE: "30"
           PER_USER_SLEEP: "1.0"
-        run: python src/main.py
-
       - name: Commit changes
         run: |
           git config user.name "github-actions"
